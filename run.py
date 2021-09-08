@@ -25,6 +25,26 @@ def create_search_url(title, author, webpage):
         title_ebay = title.replace(' ', '+').replace("'", '%27')
         template_ebay = f'https://www.ebay.it/sch/i.html?_from=R40&_trksid=p2380057.m570.l1313&_nkw={title_ebay}+{author}&_sacat=0'
         return(template_ebay)
+
+def ebay(title, author):
+    webpage = create_search_url(title, author, 'ebay')
+    driver = webdriver.PhantomJS(executable_path='.\\phantomjs-2.1.1-windows\\bin\\phantomjs.exe')
+    driver.get(webpage)
+    html = driver.page_source
+    html = BeautifulSoup(html, "html.parser")
+    list_titles = list(map(lambda x: x.text.strip(), html.select("ul > li > div > div.s-item__info.clearfix > a > h3")))
+    list_prices = list(map(lambda x: x.text.strip(), html.select("ul > li > div > div.s-item__info.clearfix > div.s-item__details.clearfix > div:nth-child(1) > span")))
+    list_prices = [float(x.replace('EUR', '').replace(',', '.')) for x in list_prices]
+    list_links = list(map(lambda x: x['href'], html.select("ul > li > div > div.s-item__info.clearfix > a")))
+    
+    list_of_books = [Book(title, link, author, price) for title, link, price in zip(list_titles, list_links, list_prices)]
+    list_of_books = [book for book in list_of_books if book.title.lower().__contains__(title) and book.title.lower().__contains__(author)]
+    
+
+    return(list_of_books)
+
+    
+
 def libraccio(title, author):
 
     webpage = create_search_url(title, author, 'libraccio')
@@ -90,24 +110,21 @@ def run():
     author = sys.argv[2]
     website = sys.argv[3]
 
-    webpage = create_search_url(title, author, 'ebay')
-    print(webpage)
-    driver = webdriver.PhantomJS(executable_path='.\\phantomjs-2.1.1-windows\\bin\\phantomjs.exe')
-    driver.get(webpage)
-    html = driver.page_source
-    html = BeautifulSoup(html, "html.parser")
-    print(html.select('h3'))
-    # libraccio_elements = libraccio(title, author)
-    # print(f'Ho estratto {len(libraccio_elements)} libri\n')
-    # if libraccio_elements:
-    #     prices = [book.price for book in libraccio_elements]
-    #     mean_price = np.mean(prices)
-    #     res = [i for i, j in enumerate(prices) if j == np.min(prices)][0]
-    #     best_link = libraccio_elements[res].link
-    #     best_price = libraccio_elements[res].price
-    #     best_title = libraccio_elements[res].title
-    #     print(f'Il libro si intitola {best_title} e costa {best_price} Euro. Lo puoi trovare al link {best_link}\n')
-    #     print(f'Per tua informazione il prezzo medio è {mean_price} Euro\n')
+    libri_ebay = ebay(title, author)
+    libri_libraccio = libraccio(title, author)
+    libri_totali = libri_ebay + libri_libraccio
+
+    if libri_totali:
+        prices = [book.price for book in libri_totali]
+        mean_price = np.mean(prices)
+        res = [i for i, j in enumerate(prices) if j == np.min(prices)][0]
+        best_link = libri_totali[res].link
+        best_price = libri_totali[res].price
+        best_title = libri_totali[res].title
+        print(f'Il libro si intitola {best_title} e costa {best_price} Euro. Lo puoi trovare al link {best_link}\n')
+        print(f'Per tua informazione il prezzo medio è {mean_price} Euro\n')
+        print(f'Sono stati esaminati i prezzi di {len(libri_totali)} libri\n')
+
 
     return 
 
